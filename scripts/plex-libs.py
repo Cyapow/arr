@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Create the five Plex libraries this stack expects, if they aren't there."""
+import re, sys, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+
+PREFS = "/home/mat/arr/config/plex/Library/Application Support/Plex Media Server/Preferences.xml"
+BASE = "http://10.0.0.22:32400"   # this server's LAN address — change for your network
+
+WANT = [
+    ("Movies",      "movie", "tv.plex.agents.movie",  "Plex Movie",     "/data/movies"),
+    ("TV Shows",    "show",  "tv.plex.agents.series", "Plex TV Series", "/data/series"),
+    ("Music",       "artist","tv.plex.agents.music",  "Plex Music",     "/data/music"),
+    ("Kids Movies", "movie", "tv.plex.agents.movie",  "Plex Movie",     "/data/movies-kids"),
+    ("Kids TV",     "show",  "tv.plex.agents.series", "Plex TV Series", "/data/series-kids"),
+]
+
+m = re.search(r'PlexOnlineToken="([^"]+)"', open(PREFS).read())
+if not m:
+    sys.exit("no PlexOnlineToken in Preferences.xml")
+TOKEN = m.group(1)
+
+
+def sections():
+    with urllib.request.urlopen(f"{BASE}/library/sections?X-Plex-Token={TOKEN}", timeout=20) as r:
+        root = ET.fromstring(r.read())
+    out = {}
+    for d in root.findall("Directory"):
+        out[d.get("title")] = (d.get("key"), d.get("type"),
+                               [l.get("path") for l in d.findall("Location")])
+    return out
+
+
+def covered_paths(existing):
+    """Folders a library already points at. Match on this, not on title --
+    a library serving /data/movies is that library whether you called it
+    Movies or Films."""
+    return {p for _, _, locs in existing.values() for p in locs}
+
+
+existing = sections()
+print("=== before ===")
+if not existing:
+    print("  (none)")
+for t, (k, ty, locs) in existing.items():
+    print(f"  [{k}] {t:<16} type={ty:<7} {locs}")
+
+print()
+created = 0
+have = covered_paths(existing)
+for name, ltype, agent, scanner, path in WANT:
+    if path in have:
+        owner = next(t for t, (_, _, locs) in existing.items() if path in locs)
+        print(f"  skip   {path} — already served by {owner!r}")
+        continue
+    q = urllib.parse.urlencode({
+        "name": name, "type": ltype, "agent": agent, "scanner": scanner,
+        "language": "en-US",          # US ratings, so PG-13 matches what Radarr reports
+        "location": path,
+        "X-Plex-Token": TOKEN,
+    })
+    req = urllib.request.Request(f"{BASE}/library/sections?{q}", method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            print(f"  create {name:<16} -> {path}  (HTTP {r.status})")
+            created += 1
+    except Exception as e:
+        print(f"  FAILED {name}: {e}")
+
+print(f"\n=== after ({created} created) ===")
+for t, (k, ty, locs) in sections().items():
+    print(f"  [{k}] {t:<16} type={ty:<7} {locs}")

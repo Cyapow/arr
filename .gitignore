@@ -1,0 +1,17 @@
+# Secrets — VPN keys, Plex claim token, *arr API keys
+.env
+*.env
+!.env.example
+
+# Application state: databases, logs, cached metadata, API keys in config.xml
+config/
+
+# Runtime artefacts
+*.log
+*.bak
+*.bak-*
+__pycache__/
+*.pyc
+
+# Media
+downloads/

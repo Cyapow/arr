@@ -1,0 +1,313 @@
+# arr stack — AirVPN (WireGuard) via gluetun
+#
+# Network layout:
+#   gluetun          -> owns the VPN netns, publishes all child ports on the host
+#   netns children   -> qbittorrent, nzbget, radarr, sonarr, lidarr, prowlarr,
+#                       bazarr, flaresolverr
+#                       (they share gluetun's network stack; they talk to each other on
+#                        127.0.0.1 and their egress can only leave via the tunnel)
+#   arr bridge       -> gluetun, jellyseerr, unpackerr, dozzle, watchtower
+#                       (unpackerr reaches the *arr APIs at http://gluetun:<port>)
+#   host             -> plex (LAN discovery, remote access, iGPU transcode)
+
+name: arr
+
+networks:
+  arr:
+    name: arr
+
+x-common: &common
+  restart: unless-stopped
+  environment: &common-env
+    PUID: ${PUID}
+    PGID: ${PGID}
+    TZ: ${TZ}
+
+services:
+
+  # ────────────────────────────────────────────────────────────────────
+  # VPN gateway. Everything below with `network_mode: service:gluetun`
+  # has no other route out — if this container stops, they lose network.
+  # ────────────────────────────────────────────────────────────────────
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      - arr
+    ports:
+      - "127.0.0.1:8000:8000"   # gluetun control server
+      - "10.0.0.22:8080:8080"   # qbittorrent
+      - "10.0.0.22:6789:6789"   # nzbget
+      - "10.0.0.22:7878:7878"   # radarr
+      - "10.0.0.22:8989:8989"   # sonarr
+      - "10.0.0.22:8686:8686"   # lidarr
+      - "10.0.0.22:6767:6767"   # bazarr
+      - "10.0.0.22:9696:9696"   # prowlarr
+      - "10.0.0.22:8191:8191"   # flaresolverr
+    environment:
+      TZ: ${TZ}
+      VPN_SERVICE_PROVIDER: airvpn
+      VPN_TYPE: wireguard
+      WIREGUARD_PRIVATE_KEY: ${WIREGUARD_PRIVATE_KEY}
+      WIREGUARD_PRESHARED_KEY: ${WIREGUARD_PRESHARED_KEY}
+      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES}
+      SERVER_COUNTRIES: ${SERVER_COUNTRIES}
+      # Let LAN clients reach the published web UIs (gluetun drops non-tunnel
+      # traffic by default, including replies to your browser).
+      FIREWALL_OUTBOUND_SUBNETS: 10.0.0.0/24,172.16.0.0/12
+      # Inbound port you forwarded in the AirVPN client area, for qbittorrent.
+      FIREWALL_VPN_INPUT_PORTS: ${VPN_FORWARDED_PORT}
+      HEALTH_VPN_DURATION_INITIAL: 30s
+    labels:
+      # Updating gluetun tears down every container sharing its netns, and
+      # watchtower will not re-attach them. Update it with ./update.sh instead.
+      com.centurylinklabs.watchtower.enable: "false"
+
+  # ────────────────────────────────────────────────────────────────────
+  # Downloaders (behind VPN)
+  # ────────────────────────────────────────────────────────────────────
+  qbittorrent:
+    <<: *common
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      WEBUI_PORT: 8080
+      TORRENTING_PORT: ${VPN_FORWARDED_PORT}
+    volumes:
+      - ./config/qbittorrent:/config
+      - /data/content:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  nzbget:
+    <<: *common
+    image: lscr.io/linuxserver/nzbget:latest
+    container_name: nzbget
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./config/nzbget:/config
+      - /data/content:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  # ────────────────────────────────────────────────────────────────────
+  # *arr apps (behind VPN — indexer and tracker queries must not leak)
+  # ────────────────────────────────────────────────────────────────────
+  radarr:
+    <<: *common
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./config/radarr:/config
+      - /data/content:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  sonarr:
+    <<: *common
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./config/sonarr:/config
+      - /data/content:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  lidarr:
+    <<: *common
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./config/lidarr:/config
+      - /data/content:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  bazarr:
+    <<: *common
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./config/bazarr:/config
+      - /data/content:/data
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  prowlarr:
+    <<: *common
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    volumes:
+      - ./config/prowlarr:/config
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    network_mode: service:gluetun
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  # ────────────────────────────────────────────────────────────────────
+  # Plex — host network, direct LAN. Deliberately NOT behind the VPN:
+  # GDM discovery, plex.direct remote access and client streaming all
+  # break when Plex egresses through a tunnel.
+  # ────────────────────────────────────────────────────────────────────
+  plex:
+    <<: *common
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    devices:
+      - /dev/dri:/dev/dri          # i9-9900 iGPU -> QuickSync transcoding
+    environment:
+      <<: *common-env
+      VERSION: docker
+      PLEX_CLAIM: ${PLEX_CLAIM}
+    volumes:
+      - ./config/plex:/config
+      - /data/content:/data:ro
+
+  # ────────────────────────────────────────────────────────────────────
+  # Support services — no VPN needed (Docker socket + local disk only)
+  # ────────────────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────────────────
+  # Jellyseerr — request UI. Bridge network, NOT behind the VPN:
+  # it signs users in against plex.tv and must reach Plex on the host.
+  # Reaches the *arr APIs through gluetun's published hostname.
+  # ────────────────────────────────────────────────────────────────────
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    networks:
+      - arr
+    # DNS over UDP gets dropped while the link is saturated by downloads, and a
+    # single-attempt lookup then fails with EAI_AGAIN. Measured: 4/40 failures
+    # at one try, 0/20 at three. Two nameservers + retries; musl (Alpine) queries
+    # both in parallel.
+    dns:
+      - 10.0.0.1
+      - 1.1.1.1
+    dns_opt:
+      - timeout:2
+      - attempts:5
+    ports:
+      - "10.0.0.22:5055:5055"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Plex runs on the host netns
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    volumes:
+      - ./config/jellyseerr:/app/config
+
+  unpackerr:
+    image: ghcr.io/unpackerr/unpackerr:latest
+    container_name: unpackerr
+    restart: unless-stopped
+    networks:
+      - arr
+    # DNS over UDP gets dropped while the link is saturated by downloads, and a
+    # single-attempt lookup then fails with EAI_AGAIN. Measured: 4/40 failures
+    # at one try, 0/20 at three. Two nameservers + retries; musl (Alpine) queries
+    # both in parallel.
+    dns:
+      - 10.0.0.1
+      - 1.1.1.1
+    dns_opt:
+      - timeout:2
+      - attempts:5
+    user: ${PUID}:${PGID}
+    environment:
+      TZ: ${TZ}
+      UN_SONARR_0_URL: http://gluetun:8989
+      UN_SONARR_0_API_KEY: ${SONARR_API_KEY}
+      UN_SONARR_0_PATHS_0: /data/content/downloads/complete
+      UN_RADARR_0_URL: http://gluetun:7878
+      UN_RADARR_0_API_KEY: ${RADARR_API_KEY}
+      UN_RADARR_0_PATHS_0: /data/content/downloads/complete
+      UN_LIDARR_0_URL: http://gluetun:8686
+      UN_LIDARR_0_API_KEY: ${LIDARR_API_KEY}
+      UN_LIDARR_0_PATHS_0: /data/content/downloads/complete
+    volumes:
+      - /data/content:/data/content
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    networks:
+      - arr
+    ports:
+      - "10.0.0.22:8888:8080"
+    environment:
+      TZ: ${TZ}
+      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|jellyseerr|unpackerr|watchtower"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  watchtower:
+    image: nickfedor/watchtower:latest   # containrrr/watchtower is unmaintained since 2024
+    container_name: watchtower
+    restart: unless-stopped
+    networks:
+      - arr
+    # DNS over UDP gets dropped while the link is saturated by downloads, and a
+    # single-attempt lookup then fails with EAI_AGAIN. Measured: 4/40 failures
+    # at one try, 0/20 at three. Two nameservers + retries; musl (Alpine) queries
+    # both in parallel.
+    dns:
+      - 10.0.0.1
+      - 1.1.1.1
+    dns_opt:
+      - timeout:2
+      - attempts:5
+    environment:
+      TZ: ${TZ}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"   # 04:00 daily
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
