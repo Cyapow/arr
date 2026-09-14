@@ -10,32 +10,22 @@ download traffic forced through AirVPN, Plex deliberately outside the tunnel.
 ## Before you copy this
 
 **`10.0.0.22` is this server's LAN address, not a standard.** Most home networks
-hand out `192.168.0.x` or `192.168.1.x`, so yours will almost certainly differ.
-Find it with `ip -4 addr show` (or `hostname -I`).
+use `192.168.0.x` or `192.168.1.x`. All three network values live in `.env` and
+nowhere else:
 
-Three host-specific values run through the whole repo:
+```
+LAN_IP=10.0.0.22          # the server       ip -4 addr show
+LAN_SUBNET=10.0.0.0/24    # the LAN          usually 192.168.1.0/24
+LAN_DNS=10.0.0.1          # the router       ip route | grep default
+```
 
-| Value here | What it is | Yours |
-|---|---|---|
-| `10.0.0.22` | the server's LAN address | `ip -4 addr show` |
-| `10.0.0.0/24` | the LAN subnet | usually `192.168.1.0/24` |
-| `10.0.0.1` | the router, used as upstream DNS | usually `192.168.1.1` |
+`docker-compose.yml` and every script read them from there. The only other
+places the address appears are two settings applied inside apps — Plex's
+`allowedNetworks` and Jellyseerr's Plex server address — which SETUP.md covers.
 
-Where they appear:
-
-- `docker-compose.yml` — every published port is bound to the LAN address rather
-  than `0.0.0.0`, plus `FIREWALL_OUTBOUND_SUBNETS` and the `dns:` entries
-- `scripts/*.py` — `HOST = "10.0.0.22"` at the top of each
-- Plex's `allowedNetworks` setting
-- Jellyseerr's Plex server address
-
-Binding to the LAN address instead of `0.0.0.0` is deliberate — it keeps the web
-UIs off any other interface. It does mean the address appears in more places than
-it otherwise would.
-
-A static address (DHCP reservation or static lease) is worth setting up. If the
-server's IP changes, the published ports stop binding and the containers fail to
-start.
+Published ports bind to `LAN_IP` rather than `0.0.0.0` on purpose: it keeps the
+web UIs off any other interface. Give the server a static lease — if the address
+changes, the ports stop binding and containers fail to start.
 
 ## Layout
 
@@ -183,3 +173,8 @@ docker compose logs -f <service>   # or use Dozzle
 
 Watchtower updates the four bridge containers nightly at 04:00. The nine under
 gluetun are excluded on purpose — see DECISIONS.md.
+
+A full `docker compose up -d` will **recreate anything Watchtower has updated
+since compose last touched it** — the image changed underneath, so compose no
+longer recognises the container as its own. Harmless, but it restarts Plex.
+Prefer `docker compose up -d <service>` for targeted changes.

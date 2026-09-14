@@ -213,6 +213,18 @@ This was also a **leak**: unbound, qBittorrent could send peer traffic from the
 bridge address, outside the tunnel. Binding by interface name closes that and
 acts as a kill switch — no `tun0`, no binding, no traffic.
 
+### `docker compose up -d` recreates containers Watchtower has updated
+
+A full `up -d` after a compose edit recreated plex, dozzle and watchtower even
+though `docker compose config` rendered byte-identical before and after. The
+tell was image age: all three had images newer than the original pull;
+jellyseerr and unpackerr, whose images had not changed, were untouched.
+
+Watchtower had replaced them. It recreates a container with the new image, but
+the result no longer matches compose's own record of it, so compose takes it
+back on the next full `up`. Harmless — config is in volumes — but it restarts
+Plex mid-stream. Use `up -d <service>` for targeted changes.
+
 ### Radarr renames files but not folders
 
 Changing `movieFolderFormat` and running the rename command renames files only.

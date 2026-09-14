@@ -17,28 +17,29 @@ ls -l /dev/dri           # Plex hardware transcoding needs this
 ip -4 addr show          # the server's LAN address — you need this everywhere
 ```
 
-**Substitute your own addresses throughout.** This repo is written against
-`10.0.0.22`; most home networks use `192.168.0.x` or `192.168.1.x`.
+**Your network addresses go in `.env`, nowhere else.** The three `LAN_*` values
+at the top of it feed `docker-compose.yml` and every script:
 
-| Here | Meaning | Find yours |
+| Key | Meaning | Find yours |
 |---|---|---|
-| `10.0.0.22` | the server's LAN address | `ip -4 addr show` |
-| `10.0.0.0/24` | the LAN subnet | usually `192.168.1.0/24` |
-| `10.0.0.1` | the router, used as upstream DNS | `ip route \| grep default` |
+| `LAN_IP` | the server's LAN address | `ip -4 addr show` |
+| `LAN_SUBNET` | the LAN subnet | usually `192.168.1.0/24` |
+| `LAN_DNS` | the router, used as upstream DNS | `ip route \| grep default` |
 
-They appear in `docker-compose.yml` (published ports, `FIREWALL_OUTBOUND_SUBNETS`,
-`dns:`), at the top of each script in `scripts/`, in Plex's `allowedNetworks`,
-and in Jellyseerr's Plex server address. Search and replace before first start:
-
-```bash
-grep -rn '10\.0\.0\.' docker-compose.yml scripts/
-```
+Two settings applied *inside* apps also carry the address and are set in their
+own steps: Plex's `allowedNetworks` (step 11) and Jellyseerr's Plex server
+address (step 12).
 
 Give the server a static address or a DHCP reservation. If it changes, the
 published ports stop binding and containers fail to start.
 
 The media mount must be **one filesystem**. Downloads and libraries on separate
 mounts silently break hardlinking, and every import becomes a full copy.
+
+Everything below assumes the stack lives at **`~/arr`** and media at
+**`/data/content`**. Neither is special — the scripts locate their own config
+relative to wherever they are, and the media root is set once in
+`docker-compose.yml`. Substitute freely; just be consistent.
 
 ## 2. Directories
 
@@ -63,6 +64,10 @@ chmod 600 .env
 ```
 
 Fill in `.env`:
+
+**Network** — `LAN_IP`, `LAN_SUBNET`, `LAN_DNS`, as above. Nothing starts without
+`LAN_IP`: every published port binds to it, and the scripts refuse to run if it
+is missing.
 
 **AirVPN** — Client Area → Config Generator → WireGuard. From the `.conf`:
 `PrivateKey` → `WIREGUARD_PRIVATE_KEY`, `Address` → `WIREGUARD_ADDRESSES`,
@@ -428,7 +433,7 @@ it, because the request is what marks the title.
 ### Routing cron
 
 ```bash
-( crontab -l 2>/dev/null; echo '*/10 * * * * /home/mat/arr/scripts/kids-route.py >> /home/mat/arr/scripts/kids-route.log 2>&1' ) | crontab -
+( crontab -l 2>/dev/null; echo "*/10 * * * * $HOME/arr/scripts/kids-route.py >> $HOME/arr/scripts/kids-route.log 2>&1" ) | crontab -
 ```
 
 ## 13. Unpackerr
