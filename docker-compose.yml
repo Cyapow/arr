@@ -41,14 +41,14 @@ services:
       - arr
     ports:
       - "127.0.0.1:8000:8000"   # gluetun control server
-      - "10.0.0.22:8080:8080"   # qbittorrent
-      - "10.0.0.22:6789:6789"   # nzbget
-      - "10.0.0.22:7878:7878"   # radarr
-      - "10.0.0.22:8989:8989"   # sonarr
-      - "10.0.0.22:8686:8686"   # lidarr
-      - "10.0.0.22:6767:6767"   # bazarr
-      - "10.0.0.22:9696:9696"   # prowlarr
-      - "10.0.0.22:8191:8191"   # flaresolverr
+      - "${LAN_IP}:8080:8080"   # qbittorrent
+      - "${LAN_IP}:6789:6789"   # nzbget
+      - "${LAN_IP}:7878:7878"   # radarr
+      - "${LAN_IP}:8989:8989"   # sonarr
+      - "${LAN_IP}:8686:8686"   # lidarr
+      - "${LAN_IP}:6767:6767"   # bazarr
+      - "${LAN_IP}:9696:9696"   # prowlarr
+      - "${LAN_IP}:8191:8191"   # flaresolverr
     environment:
       TZ: ${TZ}
       VPN_SERVICE_PROVIDER: airvpn
@@ -59,7 +59,7 @@ services:
       SERVER_COUNTRIES: ${SERVER_COUNTRIES}
       # Let LAN clients reach the published web UIs (gluetun drops non-tunnel
       # traffic by default, including replies to your browser).
-      FIREWALL_OUTBOUND_SUBNETS: 10.0.0.0/24,172.16.0.0/12
+      FIREWALL_OUTBOUND_SUBNETS: ${LAN_SUBNET},172.16.0.0/12
       # Inbound port you forwarded in the AirVPN client area, for qbittorrent.
       FIREWALL_VPN_INPUT_PORTS: ${VPN_FORWARDED_PORT}
       HEALTH_VPN_DURATION_INITIAL: 30s
@@ -228,13 +228,13 @@ services:
     # at one try, 0/20 at three. Two nameservers + retries; musl (Alpine) queries
     # both in parallel.
     dns:
-      - 10.0.0.1
+      - ${LAN_DNS}
       - 1.1.1.1
     dns_opt:
       - timeout:2
       - attempts:5
     ports:
-      - "10.0.0.22:5055:5055"
+      - "${LAN_IP}:5055:5055"
     extra_hosts:
       - "host.docker.internal:host-gateway"   # Plex runs on the host netns
     environment:
@@ -254,7 +254,7 @@ services:
     # at one try, 0/20 at three. Two nameservers + retries; musl (Alpine) queries
     # both in parallel.
     dns:
-      - 10.0.0.1
+      - ${LAN_DNS}
       - 1.1.1.1
     dns_opt:
       - timeout:2
@@ -281,7 +281,7 @@ services:
     networks:
       - arr
     ports:
-      - "10.0.0.22:8888:8080"
+      - "${LAN_IP}:8888:8080"
     environment:
       TZ: ${TZ}
       DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|jellyseerr|unpackerr|watchtower"
@@ -299,7 +299,7 @@ services:
     # at one try, 0/20 at three. Two nameservers + retries; musl (Alpine) queries
     # both in parallel.
     dns:
-      - 10.0.0.1
+      - ${LAN_DNS}
       - 1.1.1.1
     dns_opt:
       - timeout:2
