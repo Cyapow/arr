@@ -41,9 +41,32 @@ from pathlib import Path
 
 ARR_DIR = Path(__file__).resolve().parent.parent
 KIDS_USERS_FILE = Path(__file__).resolve().parent / "kids-users.txt"
-HOST = "10.0.0.22"   # this server's LAN address — change for your network
 TAG = "kids"
 TAG_EXCLUDE = "not-kids"
+
+
+def load_env():
+    """
+    Read KEY=VALUE pairs from the stack's .env. Real environment variables win,
+    so a one-off override is `LAN_IP=192.168.1.5 script.py`. No dependency on
+    python-dotenv -- the file is simple enough to parse by hand.
+    """
+    import os
+    env = {}
+    f = ARR_DIR / ".env"
+    if f.exists():
+        for line in f.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip().strip('"').strip("'")
+    env.update({k: v for k, v in os.environ.items() if k in ("LAN_IP", "LAN_SUBNET", "LAN_DNS")})
+    return env
+
+
+ENV = load_env()
+HOST = ENV.get("LAN_IP") or sys.exit("LAN_IP is not set -- add it to .env (the server's LAN address)")
 
 APPS = {
     "radarr": {"port": 7878, "list": "movie", "editor": "movie/editor",

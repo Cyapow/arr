@@ -1,9 +1,33 @@
 #!/usr/bin/env python3
 """Create the five Plex libraries this stack expects, if they aren't there."""
 import re, sys, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+from pathlib import Path
 
-PREFS = "/home/mat/arr/config/plex/Library/Application Support/Plex Media Server/Preferences.xml"
-BASE = "http://10.0.0.22:32400"   # this server's LAN address — change for your network
+ARR_DIR = Path(__file__).resolve().parent.parent          # the stack root, wherever it lives
+PREFS = ARR_DIR / "config/plex/Library/Application Support/Plex Media Server/Preferences.xml"
+def load_env():
+    """
+    Read KEY=VALUE pairs from the stack's .env. Real environment variables win,
+    so a one-off override is `LAN_IP=192.168.1.5 script.py`. No dependency on
+    python-dotenv -- the file is simple enough to parse by hand.
+    """
+    import os
+    env = {}
+    f = ARR_DIR / ".env"
+    if f.exists():
+        for line in f.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip().strip('"').strip("'")
+    env.update({k: v for k, v in os.environ.items() if k in ("LAN_IP", "LAN_SUBNET", "LAN_DNS")})
+    return env
+
+
+ENV = load_env()
+HOST = ENV.get("LAN_IP") or sys.exit("LAN_IP is not set -- add it to .env (the server's LAN address)")
+BASE = f"http://{HOST}:32400"
 
 WANT = [
     ("Movies",      "movie", "tv.plex.agents.movie",  "Plex Movie",     "/data/movies"),

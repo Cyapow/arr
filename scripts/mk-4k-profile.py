@@ -12,15 +12,39 @@ Remux-2160p is deliberately left out -- remuxes run 60-90 GB each and /data is
 2.6 TB. Tick it on in the UI if you'd rather have them.
 """
 import json, re, sys, urllib.error, urllib.request
+from pathlib import Path
 
+ARR_DIR = Path(__file__).resolve().parent.parent          # the stack root, wherever it lives
 NAME = "4K + 1080p fallback"
-BASE_ARR = "http://10.0.0.22"   # this server's LAN address
-JS = "http://10.0.0.22:5055/api/v1"
+def load_env():
+    """
+    Read KEY=VALUE pairs from the stack's .env. Real environment variables win,
+    so a one-off override is `LAN_IP=192.168.1.5 script.py`. No dependency on
+    python-dotenv -- the file is simple enough to parse by hand.
+    """
+    import os
+    env = {}
+    f = ARR_DIR / ".env"
+    if f.exists():
+        for line in f.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip().strip('"').strip("'")
+    env.update({k: v for k, v in os.environ.items() if k in ("LAN_IP", "LAN_SUBNET", "LAN_DNS")})
+    return env
+
+
+ENV = load_env()
+HOST = ENV.get("LAN_IP") or sys.exit("LAN_IP is not set -- add it to .env (the server's LAN address)")
+BASE_ARR = f"http://{HOST}"
+JS = f"http://{HOST}:5055/api/v1"
 
 
 def arr_key(app):
     return re.search(r"<ApiKey>([^<]+)</ApiKey>",
-                     open(f"/home/mat/arr/config/{app}/config.xml").read()).group(1)
+                     open(ARR_DIR / f"config/{app}/config.xml").read()).group(1)
 
 
 def call(url, key, header, method="GET", body=None):
@@ -87,7 +111,7 @@ radarr_id = build(7878, "radarr")
 sonarr_id = build(8989, "sonarr")
 
 print("\n=== pointing Jellyseerr at it ===")
-jskey = json.load(open("/home/mat/arr/config/jellyseerr/settings.json"))["main"]["apiKey"]
+jskey = json.load(open(ARR_DIR / "config/jellyseerr/settings.json"))["main"]["apiKey"]
 for svc, pid in (("radarr", radarr_id), ("sonarr", sonarr_id)):
     for s in call(f"{JS}/settings/{svc}", jskey, "X-Api-Key"):
         before = s.get("activeProfileName")
