@@ -21,7 +21,7 @@ LAN_DNS=10.0.0.1          # the router       ip route | grep default
 
 `docker-compose.yml` and every script read them from there. The only other
 places the address appears are two settings applied inside apps — Plex's
-`allowedNetworks` and Jellyseerr's Plex server address — which SETUP.md covers.
+`allowedNetworks` and Seerr's Plex server address — which SETUP.md covers.
 
 Published ports bind to `LAN_IP` rather than `0.0.0.0` on purpose: it keeps the
 web UIs off any other interface. Give the server a static lease — if the address
@@ -34,7 +34,7 @@ gluetun ─┬─ qbittorrent  nzbget                 downloaders
          ├─ radarr  sonarr  lidarr  prowlarr    indexer + library managers
          └─ bazarr  flaresolverr                subtitles, cloudflare solver
 
-arr bridge ── jellyseerr  unpackerr  dozzle  watchtower
+arr bridge ── seerr       unpackerr  dozzle  watchtower
 
 host network ── plex
 ```
@@ -50,8 +50,8 @@ tunnel reaches them at the hostname `gluetun`.
 | | |
 |---|---|
 | Inside the tunnel, talking to a sibling | `localhost:7878` |
-| Outside the tunnel (Jellyseerr), talking in | `gluetun:7878` |
-| Jellyseerr → Plex | `10.0.0.22:32400` |
+| Outside the tunnel (Seerr), talking in | `gluetun:7878` |
+| Seerr → Plex | `10.0.0.22:32400` |
 | Anything → the LAN | `10.0.0.22:<port>` |
 
 ## Web UIs
@@ -67,7 +67,7 @@ tunnel reaches them at the hostname `gluetun`.
 | Bazarr | http://10.0.0.22:6767 | yes |
 | FlareSolverr | http://10.0.0.22:8191 | yes |
 | Plex | http://10.0.0.22:32400/web | no — deliberate |
-| Jellyseerr | http://10.0.0.22:5055 | no |
+| Seerr | http://10.0.0.22:5055 | no |
 | Dozzle (logs) | http://10.0.0.22:8888 | no |
 
 ## Storage
@@ -97,7 +97,7 @@ A `1` means Radarr copied instead of linked, and you are storing everything twic
 ## Kids routing
 
 A title belongs to the Kids libraries if **either** it was requested in
-Jellyseerr by an account listed in `scripts/kids-users.txt`, **or** it carries
+Seerr by an account listed in `scripts/kids-users.txt`, **or** it carries
 the `kids` tag in Radarr/Sonarr — **unless** it carries `not-kids`, which always
 wins.
 
@@ -106,7 +106,7 @@ wins.
 | Move something into the kids libraries | tag it `kids` |
 | Get something out, that a kid requested | tag it `not-kids` |
 
-`not-kids` is the only way to override a Jellyseerr request. Removing the `kids`
+`not-kids` is the only way to override a Seerr request. Removing the `kids`
 tag cannot undo one, because the request itself is what marks the title.
 
 `scripts/kids-route.py` runs every 10 minutes from cron and moves titles between
@@ -171,7 +171,7 @@ Nothing to fix server-side — it's the app. An Apple TV direct plays them all.
 docker compose logs -f <service>   # or use Dozzle
 ```
 
-Watchtower updates the four bridge containers nightly at 04:00. The nine under
+Watchtower updates the four bridge containers (plex, seerr, unpackerr, dozzle) nightly at 04:00. The nine under
 gluetun are excluded on purpose — see DECISIONS.md.
 
 A full `docker compose up -d` will **recreate anything Watchtower has updated

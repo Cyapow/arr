@@ -77,12 +77,12 @@ A move within one filesystem is a rename, so the inode is preserved and the
 hardlink qBittorrent seeds from stays valid. Verified: 53 files still `links=2`
 after the migration.
 
-Selection is the union of: requested in Jellyseerr by an account in
+Selection is the union of: requested in Seerr by an account in
 `kids-users.txt`, or tagged `kids` in the app — minus anything tagged
 `not-kids`.
 
 The exclusion tag exists because the union alone is one-way. A title pulled in
-by a Jellyseerr request cannot be removed by untagging: the request is what
+by a Seerr request cannot be removed by untagging: the request is what
 marks it, so the next run moves it straight back. Without `not-kids` the only
 escapes were deleting the request or removing the account from
 `kids-users.txt`.
@@ -91,7 +91,7 @@ escapes were deleting the request or removing the account from
 
 ## Things that broke
 
-### Jellyseerr "Tag Requests" is incompatible with current Radarr
+### Seerr "Tag Requests" is incompatible with current Radarr
 
 Enabling it generates tags of the form `1 - username`. Radarr rejects any
 label containing spaces:
@@ -102,19 +102,19 @@ label containing spaces:
 
 The failure is not cosmetic — the tag is created *before* the movie is added, so
 **every request fails to reach Radarr** and sits at PROCESSING forever. Leave the
-setting off. `kids-route.py` reads requesters from the Jellyseerr API instead,
+setting off. `kids-route.py` reads requesters from the Seerr API instead,
 joining on `externalServiceId`.
 
-### Plex Home managed users cannot use Jellyseerr
+### Plex Home managed users cannot use Seerr
 
 They have no plex.tv login — no username, no email, no password — so Plex OAuth
 has nothing to authenticate and Import Plex Users returns an empty list. Not a
 bug and not fixable by configuration.
 
 Options were a real Plex account per child (an email each, invited as a friend)
-or a **local Jellyseerr account**. Local won: no extra Plex accounts, and the
-Jellyseerr and Plex identities don't need to match because routing keys off the
-Jellyseerr user.
+or a **local Seerr account**. Local won: no extra Plex accounts, and the
+Seerr and Plex identities don't need to match because routing keys off the
+Seerr user.
 
 ### Plex refuses to purge a library that has gone completely empty
 
@@ -144,7 +144,7 @@ the container before editing config files by hand.
 
 ### DNS fails intermittently under download load
 
-Jellyseerr logged `getaddrinfo EAI_AGAIN plex.tv` and `EAI_AGAIN
+Seerr logged `getaddrinfo EAI_AGAIN plex.tv` and `EAI_AGAIN
 …plex.direct`, breaking Plex scans and the plex.tv user lookup at random.
 
 Measured, at 282 Mbit/s inbound:
@@ -160,7 +160,7 @@ No interface errors, no conntrack pressure.
 
 It only surfaced on **cache misses** — systemd-resolved answers cached names in
 1ms — which is why it looked random. Alpine's musl resolver is less forgiving
-than glibc's, which is why Jellyseerr was hit hardest.
+than glibc's, which is why Seerr was hit hardest.
 
 Fixed with `dns_opt: timeout:2, attempts:5` plus a second nameserver on the
 bridge containers. 40/40 under identical load afterwards. Containers behind
@@ -218,7 +218,7 @@ acts as a kill switch — no `tun0`, no binding, no traffic.
 A full `up -d` after a compose edit recreated plex, dozzle and watchtower even
 though `docker compose config` rendered byte-identical before and after. The
 tell was image age: all three had images newer than the original pull;
-jellyseerr and unpackerr, whose images had not changed, were untouched.
+seerr and unpackerr, whose images had not changed, were untouched.
 
 Watchtower had replaced them. It recreates a container with the new image, but
 the result no longer matches compose's own record of it, so compose takes it
@@ -235,12 +235,41 @@ Sonarr additionally had **season folders disabled**, leaving every episode loose
 in the series directory. `seasonFolder=true` applies to new imports only; a
 `RenameSeries` pass afterwards relocates existing files.
 
-### Jellyseerr API quirks
+### Jellyseerr became Seerr (October 2026)
+
+The project was renamed upstream. `fallenbagel/jellyseerr` reports its version as
+literally `2.7.3-deprecated` and stops there; the successor is
+`seerr-team/seerr`, currently v3.5.0.
+
+Migration is genuinely automatic — point the new image at the same config
+directory and it converts in place. All 104 requests, both user accounts and
+both *arr connections carried over untouched. Three things are not automatic:
+
+- **It runs as `node` (uid 1000), not root.** Jellyseerr ran as root and had left
+  19 root-owned files in the config directory, including the sqlite database.
+  Without `chown -R 1000:1000` the new container cannot write and fails on boot.
+- **The image ships no init process.** `init: true` in compose, or zombie
+  processes accumulate.
+- **The Plex server setting reverted** to the `plex.direct` hostname with SSL,
+  undoing the switch to a literal IP. That hostname is exactly what produced the
+  intermittent `EAI_AGAIN` scan failures, so it had to be re-applied after
+  migrating. Worth re-checking any setting you had deliberately changed.
+
+The official docs give the image as `ghcr.io/seerr-team/seerr:latest`, which did
+not resolve; `seerr/seerr:latest` on Docker Hub does, and carries
+`org.opencontainers.image.source = github.com/seerr-team/seerr`, so provenance
+checks out.
+
+v3.5.0 also changed the library API: `GET /settings/plex/library` no longer
+accepts `sync` or `enable` parameters. Use `POST /settings/plex/library/sync`
+and `PUT /settings/plex/library/{id}` instead.
+
+### Seerr API quirks
 
 - `PUT /settings/radarr/{id}` fails with 400 if `id` is in the body
 - `POST /settings/plex` rejects `name`, `machineId` and `libraries` as read-only
   — send only `ip`, `port`, `useSsl`
-- After deleting and recreating Plex libraries, Jellyseerr keeps the **old
+- After deleting and recreating Plex libraries, Seerr keeps the **old
   section ids** until `GET /settings/plex/library?sync=true`. It silently scans
   nothing in the meantime.
 

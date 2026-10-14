@@ -1,5 +1,5 @@
-# Jellyseerr accounts whose requests go to the Kids libraries.
-# One per line: numeric Jellyseerr id, Plex username, display name, or email.
+# Seerr accounts whose requests go to the Kids libraries.
+# One per line: numeric Seerr id, Plex username, display name, or email.
 #
 # Anything these accounts request is hardlinked into Kids Movies / Kids TV
 # within 10 minutes. They keep watching in Plex as the managed 'Kids' profile;
@@ -10,4 +10,4 @@
 # To override a request, tag the title `not-kids` in Radarr/Sonarr — removing
 # the `kids` tag will not work, because the request itself is the marker.
 
-2    # local Jellyseerr account 'kids' (local account for the kids)
+2    # local Seerr account 'kids' (local account for the kids)

@@ -27,7 +27,7 @@ at the top of it feed `docker-compose.yml` and every script:
 | `LAN_DNS` | the router, used as upstream DNS | `ip route \| grep default` |
 
 Two settings applied *inside* apps also carry the address and are set in their
-own steps: Plex's `allowedNetworks` (step 11) and Jellyseerr's Plex server
+own steps: Plex's `allowedNetworks` (step 11) and Seerr's Plex server
 address (step 12).
 
 Give the server a static address or a DHCP reservation. If it changes, the
@@ -44,7 +44,7 @@ relative to wherever they are, and the media root is set once in
 ## 2. Directories
 
 ```bash
-mkdir -p ~/arr/config/{gluetun,qbittorrent,nzbget,radarr,sonarr,lidarr,prowlarr,bazarr,jellyseerr,unpackerr,plex}
+mkdir -p ~/arr/config/{gluetun,qbittorrent,nzbget,radarr,sonarr,lidarr,prowlarr,bazarr,seerr,unpackerr,plex}
 mkdir -p /data/content/{movies,series,music,movies-kids,series-kids}
 mkdir -p /data/content/downloads/{complete,incomplete}
 mkdir -p /data/content/downloads/complete/{Movies,Series,Music,Prowlarr}
@@ -292,7 +292,7 @@ up new folder names.
 scripts/mk-4k-profile.py
 ```
 
-Creates **`4K + 1080p fallback`** in both apps and points Jellyseerr at it.
+Creates **`4K + 1080p fallback`** in both apps and points Seerr at it.
 
 Not the stock `Ultra-HD` profile: that allows 2160p and nothing else, so any
 title without a 4K release is silently never grabbed. This allows both tiers
@@ -384,9 +384,13 @@ build collections Plex has no concept of. Not installed here.
 Settings → Users & Sharing → **Add Managed User**. Share **only** Kids Movies and
 Kids TV. Optionally also set *Allow only content rated*.
 
-A managed user cannot sign into Jellyseerr — see step 12.
+A managed user cannot sign into Seerr — see step 12.
 
-## 12. Jellyseerr — http://10.0.0.22:5055
+## 12. Seerr — http://10.0.0.22:5055
+
+Formerly Jellyseerr, renamed upstream in October 2026. Image is
+`seerr/seerr:latest`; it runs as uid 1000, so `config/seerr` must be owned by
+1000, and the service needs `init: true`.
 
 Setup wizard:
 
@@ -398,7 +402,7 @@ Setup wizard:
    `4K + 1080p fallback`, default server on
 5. **Sonarr**: hostname `gluetun`, port `8989`, root `/data/series`
 
-Hostname is `gluetun` here, not `localhost` — Jellyseerr is outside the tunnel.
+Hostname is `gluetun` here, not `localhost` — Seerr is outside the tunnel.
 
 **Leave "Tag Requests" off.** It generates Radarr tags like `1 - username`, and
 Radarr rejects any label containing spaces, which makes every request fail.
@@ -406,7 +410,7 @@ Radarr rejects any label containing spaces, which makes every request fail.
 ### Kids requesting
 
 Plex Home managed users have no plex.tv login, so they cannot sign into
-Jellyseerr and will never appear under Import Plex Users. Create a **local**
+Seerr and will never appear under Import Plex Users. Create a **local**
 account instead:
 
 Settings → Users → **Create Local User** — email (any valid format), display
@@ -417,7 +421,7 @@ They sign in with email + password, not the Plex button.
 Then add them to `scripts/kids-users.txt` (numeric id is most stable):
 
 ```
-2    # local Jellyseerr account 'kids'
+2    # local Seerr account 'kids'
 ```
 
 ```bash
@@ -427,7 +431,7 @@ scripts/kids-route.py --status
 Both tags (`kids`, `not-kids`) are created in Radarr and Sonarr on first run, so
 they appear in the tag dropdown. Tag a title `kids` to pull it into the kids
 libraries; tag it `not-kids` to push it back out. Exclusion always wins, and it
-is the only way to override a Jellyseerr request — removing `kids` will not do
+is the only way to override a Seerr request — removing `kids` will not do
 it, because the request is what marks the title.
 
 ### Routing cron
@@ -449,12 +453,12 @@ Each of Radarr, Sonarr and Lidarr should report a config count of 1 and no 401.
 
 ## 14. Verify end to end
 
-1. Jellyseerr → request a well-seeded older film
+1. Seerr → request a well-seeded older film
 2. Radarr → Activity → Queue shows the grab within a minute or two
 3. qBittorrent → torrent in category `radarr`, saving to `/data/downloads/complete`
 4. On completion Radarr imports **instantly** — a progress bar means hardlinks
    are off
-5. Plex picks it up; Jellyseerr flips the request to Available
+5. Plex picks it up; Seerr flips the request to Available
 
 ```bash
 find /data/content/movies -name '*.mkv' -printf '%n %p\n' | head    # want 2, not 1
@@ -467,7 +471,7 @@ find /data/content/movies -name '*.mkv' -printf '%n %p\n' | head    # want 2, no
 ./update.sh      # gluetun + the 8 sharing its namespace
 ```
 
-Watchtower updates plex, jellyseerr, unpackerr, dozzle nightly at 04:00. The
+Watchtower updates plex, seerr, unpackerr, dozzle nightly at 04:00. The
 gluetun group is excluded by label because recreating gluetun destroys the
 namespace its children live in and Watchtower reattaches them in the wrong order.
 Together the two cover all 14 containers.

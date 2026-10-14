@@ -6,7 +6,7 @@
 #                       bazarr, flaresolverr
 #                       (they share gluetun's network stack; they talk to each other on
 #                        127.0.0.1 and their egress can only leave via the tunnel)
-#   arr bridge       -> gluetun, jellyseerr, unpackerr, dozzle, watchtower
+#   arr bridge       -> gluetun, seerr, unpackerr, dozzle, watchtower
 #                       (unpackerr reaches the *arr APIs at http://gluetun:<port>)
 #   host             -> plex (LAN discovery, remote access, iGPU transcode)
 
@@ -213,14 +213,15 @@ services:
   # Support services — no VPN needed (Docker socket + local disk only)
   # ────────────────────────────────────────────────────────────────────
   # ────────────────────────────────────────────────────────────────────
-  # Jellyseerr — request UI. Bridge network, NOT behind the VPN:
-  # it signs users in against plex.tv and must reach Plex on the host.
-  # Reaches the *arr APIs through gluetun's published hostname.
+  # Seerr — request UI (formerly Jellyseerr, renamed upstream Oct 2026).
+  # Bridge network, NOT behind the VPN: it signs users in against plex.tv
+  # and must reach Plex on the host. Reaches the *arr APIs through gluetun.
   # ────────────────────────────────────────────────────────────────────
-  jellyseerr:
-    image: fallenbagel/jellyseerr:latest
-    container_name: jellyseerr
+  seerr:
+    image: seerr/seerr:latest
+    container_name: seerr
     restart: unless-stopped
+    init: true                 # image ships no init process; without this zombies accumulate
     networks:
       - arr
     # DNS over UDP gets dropped while the link is saturated by downloads, and a
@@ -241,7 +242,14 @@ services:
       TZ: ${TZ}
       LOG_LEVEL: info
     volumes:
-      - ./config/jellyseerr:/app/config
+      # Runs as node (uid 1000), not root — the directory must be owned by 1000.
+      - ./config/seerr:/app/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5055/api/v1/settings/public >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   unpackerr:
     image: ghcr.io/unpackerr/unpackerr:latest
@@ -284,7 +292,7 @@ services:
       - "${LAN_IP}:8888:8080"
     environment:
       TZ: ${TZ}
-      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|jellyseerr|unpackerr|watchtower"
+      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|seerr|unpackerr|watchtower"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 

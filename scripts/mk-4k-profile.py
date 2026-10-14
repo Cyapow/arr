@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Create a '4K + 1080p fallback' quality profile in Radarr and Sonarr, and point
-Jellyseerr at it.
+Seerr at it.
 
 Not the stock Ultra-HD profile: that one allows 2160p and nothing else, so any
 title without a 4K release is silently never grabbed. This allows both tiers
@@ -110,14 +110,14 @@ def build(port, app):
 radarr_id = build(7878, "radarr")
 sonarr_id = build(8989, "sonarr")
 
-print("\n=== pointing Jellyseerr at it ===")
-jskey = json.load(open(ARR_DIR / "config/jellyseerr/settings.json"))["main"]["apiKey"]
+print("\n=== pointing Seerr at it ===")
+jskey = json.load(open(ARR_DIR / "config/seerr/settings.json"))["main"]["apiKey"]
 for svc, pid in (("radarr", radarr_id), ("sonarr", sonarr_id)):
     for s in call(f"{JS}/settings/{svc}", jskey, "X-Api-Key"):
         before = s.get("activeProfileName")
         sid = s["id"]
         s["activeProfileId"] = pid
         s["activeProfileName"] = NAME
-        s.pop("id", None)          # Jellyseerr rejects the body if id is in it
+        s.pop("id", None)          # Seerr rejects the body if id is in it
         call(f"{JS}/settings/{svc}/{sid}", jskey, "X-Api-Key", "PUT", s)
         print(f"  {svc}: {before!r} -> {NAME!r}")

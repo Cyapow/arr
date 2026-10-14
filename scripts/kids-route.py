@@ -4,11 +4,11 @@ Route kids' content into the Kids libraries by MOVING it, not copying it.
 
 A title belongs to the kids libraries if EITHER:
 
-  1. it was requested in Jellyseerr by an account in kids-users.txt, or
+  1. it was requested in Seerr by an account in kids-users.txt, or
   2. it carries the `kids` tag in Radarr or Sonarr,
 
 UNLESS it carries the `not-kids` tag, which always wins. That exclusion is the
-only way to override a Jellyseerr request -- removing the `kids` tag cannot undo
+only way to override a Seerr request -- removing the `kids` tag cannot undo
 one, because the request itself is what marks the title.
 
 Everything else belongs in the main libraries.
@@ -113,9 +113,9 @@ def arr(app, path, method="GET", body=None, **params):
 
 def js(path, **params):
     try:
-        key = json.load(open(ARR_DIR / "config/jellyseerr/settings.json"))["main"]["apiKey"]
+        key = json.load(open(ARR_DIR / "config/seerr/settings.json"))["main"]["apiKey"]
     except (OSError, KeyError) as e:
-        die(f"cannot read Jellyseerr API key: {e}")
+        die(f"cannot read Seerr API key: {e}")
     url = f"http://{HOST}:5055/api/v1/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
@@ -176,7 +176,7 @@ def kids_ids(app):
 
     Requested by a kids account, or tagged `kids` -- minus anything tagged
     `not-kids`. Exclusion always wins, and it is the only way to override a
-    Jellyseerr request: untagging cannot undo one, because the request itself
+    Seerr request: untagging cannot undo one, because the request itself
     is what marks the title.
     """
     include = requested_by_kids()[app] | tagged_ids(app, TAG)
