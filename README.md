@@ -163,6 +163,21 @@ releases down so English-first releases win. Not yet done.
 **The PS5 Plex app cannot direct play HEVC**, so every 4K title transcodes on it.
 Nothing to fix server-side — it's the app. An Apple TV direct plays them all.
 
+## Reclaiming disk
+
+```bash
+scripts/reclaim.py             # show what would go
+scripts/reclaim.py --apply     # delete it
+docker compose restart qbittorrent   # release the freed space
+```
+
+Deletes completed downloads that nothing else references. It skips anything in
+the Radarr/Sonarr queues — a finished-but-not-yet-imported download looks
+identical to an orphan and deleting it strands the import.
+
+The restart is not optional: qBittorrent holds seeded files open, so the kernel
+will not release the space until it lets go.
+
 ## Day to day
 
 ```bash

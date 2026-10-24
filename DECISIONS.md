@@ -235,6 +235,33 @@ Sonarr additionally had **season folders disabled**, leaving every episode loose
 in the series directory. `seasonFolder=true` applies to new imports only; a
 `RenameSeries` pass afterwards relocates existing files.
 
+### Deleting a download by link count can kill a pending import
+
+`links == 1` means no other path references the file, which usually means the
+library copy is gone and the download is an orphan. It also describes a download
+that has **finished but not yet been imported** — there is no library hardlink
+yet because Radarr has not made one.
+
+Deleting two of those (Self/less, The Cycle) left Radarr stuck on *"qBittorrent
+is reporting missing files"* at 0%, with the films back in the missing list. The
+fix was to remove the queue entries with `blocklist=false` (the releases were
+fine — we deleted them) and re-search.
+
+`scripts/reclaim.py` now asks both apps what is in their queues and refuses to
+touch those paths, and aborts entirely if either queue cannot be read rather
+than guessing.
+
+Two more traps in the same job:
+
+- **qBittorrent holds seeded files open**, so the kernel does not release the
+  space on unlink. Deleting 208 GB freed 186 GB; the rest arrived only after
+  `docker compose restart qbittorrent`. Removing the torrent in qBittorrent
+  instead frees it immediately.
+- **`BT_backup` keeps stale `.fastresume` files** for torrents qBittorrent has
+  already removed, so counting files there overstates what is loaded — it read
+  28 when the UI showed 12. A restart rewrites the directory and clears them.
+  The UI is authoritative; the directory is not.
+
 ### Jellyseerr became Seerr (October 2026)
 
 The project was renamed upstream. `fallenbagel/jellyseerr` reports its version as
@@ -293,6 +320,18 @@ shredder for anything imported afterwards.
 
 The limit is global — qBittorrent has no per-tracker share limits — so a private
 tracker demanding longer than 10 days needs a per-torrent override.
+
+**`GlobalMaxSeedingMinutes` does not mean ten calendar days.** It counts time
+actually spent seeding, which accrues far more slowly: torrents added on
+23 September had logged only 7.9 days of seeding time by 24 October. The limit
+therefore never fired, nothing was reclaimed, and `/data` filled to 0 bytes
+twice — once on 30 September and again on 24 October.
+
+`GlobalMaxInactiveSeedingMinutes=10080` (7 days) was added alongside it. Inactivity
+is the signal that actually matters — a torrent nobody has downloaded from in a
+week is just holding disk — and it is measured in real elapsed time, so it fires
+when you expect. Seven days also clears the usual 72-hour private-tracker
+minimum before anything is removed.
 
 **`TranscoderCanOnlyRemuxVideo=0`** — set to `1` initially, on the assumption
 that every client here handles 4K natively. That assumption was wrong and it was

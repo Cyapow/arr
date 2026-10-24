@@ -169,9 +169,15 @@ Ten days of seeding, then the torrent and its files are removed:
 
 ```ini
 [BitTorrent]
-Session\GlobalMaxSeedingMinutes=14400
+Session\GlobalMaxSeedingMinutes=14400          # 10 days of ACTIVE seeding
+Session\GlobalMaxInactiveSeedingMinutes=10080  # 7 days with no upload activity
 Session\ShareLimitAction=RemoveWithContent
 ```
+
+Both limits are needed. `GlobalMaxSeedingMinutes` counts time actually spent
+seeding, not elapsed time, so it can take six weeks to reach "10 days" and is
+useless as a disk-reclaim mechanism on its own. The inactive limit measures real
+elapsed time since the last upload and is what actually frees space.
 
 Or in the UI: Tools → Options → BitTorrent → *When seeding time reaches …*
 
