@@ -34,7 +34,7 @@ gluetun ─┬─ qbittorrent  nzbget                 downloaders
          ├─ radarr  sonarr  lidarr  prowlarr    indexer + library managers
          └─ bazarr  flaresolverr                subtitles, cloudflare solver
 
-arr bridge ── seerr       unpackerr  dozzle  watchtower
+arr bridge ── seerr  arr-dashboard  unpackerr  dozzle  watchtower
 
 host network ── plex
 ```
@@ -68,6 +68,7 @@ tunnel reaches them at the hostname `gluetun`.
 | FlareSolverr | http://10.0.0.22:8191 | yes |
 | Plex | http://10.0.0.22:32400/web | no — deliberate |
 | Seerr | http://10.0.0.22:5055 | no |
+| arr-dashboard | http://10.0.0.22:3000 | no |
 | Dozzle (logs) | http://10.0.0.22:8888 | no |
 
 ## Storage
@@ -186,7 +187,7 @@ will not release the space until it lets go.
 docker compose logs -f <service>   # or use Dozzle
 ```
 
-Watchtower updates the four bridge containers (plex, seerr, unpackerr, dozzle) nightly at 04:00. The nine under
+Watchtower updates plex, seerr, unpackerr and dozzle nightly at 04:00. arr-dashboard is pinned and excluded — see DECISIONS.md. The nine under
 gluetun are excluded on purpose — see DECISIONS.md.
 
 A full `docker compose up -d` will **recreate anything Watchtower has updated

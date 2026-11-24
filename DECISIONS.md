@@ -311,6 +311,18 @@ check it.
 
 ## Deliberate trade-offs
 
+**arr-dashboard is pinned and excluded from Watchtower** — unlike the other
+bridge containers. Its release history includes upgrades that require a manual
+database migration (v2.20.0 needed `db:push`), so an unattended 04:00 update
+could leave it broken until someone noticed. The media path is unaffected either
+way; it is a read-and-control UI, not part of the download pipeline.
+
+It also does **not** manage qBittorrent. It talks to torrent clients only
+through autobrr/qui as a "federated peer", and qui could not be installed —
+GHCR denies anonymous pulls of every tag, and the newest release is v0.3.0.
+Torrents therefore stay in qBittorrent's own UI, so "one pane for everything" is
+really "one pane for the *arr apps, Plex and Seerr".
+
 **Seeding removed after 10 days, with content** — `RemoveWithContent` sounds
 destructive and is not, *given hardlinks*: the downloads path and the library
 path are the same inode, so removal drops one link and the library keeps the

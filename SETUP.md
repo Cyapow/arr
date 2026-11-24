@@ -44,7 +44,7 @@ relative to wherever they are, and the media root is set once in
 ## 2. Directories
 
 ```bash
-mkdir -p ~/arr/config/{gluetun,qbittorrent,nzbget,radarr,sonarr,lidarr,prowlarr,bazarr,seerr,unpackerr,plex}
+mkdir -p ~/arr/config/{gluetun,qbittorrent,nzbget,radarr,sonarr,lidarr,prowlarr,bazarr,seerr,arr-dashboard,unpackerr,plex}
 mkdir -p /data/content/{movies,series,music,movies-kids,series-kids}
 mkdir -p /data/content/downloads/{complete,incomplete}
 mkdir -p /data/content/downloads/complete/{Movies,Series,Music,Prowlarr}
@@ -446,6 +446,44 @@ it, because the request is what marks the title.
 ( crontab -l 2>/dev/null; echo "*/10 * * * * $HOME/arr/scripts/kids-route.py >> $HOME/arr/scripts/kids-route.log 2>&1" ) | crontab -
 ```
 
+## 13. arr-dashboard — http://10.0.0.22:3000
+
+One UI over Radarr, Sonarr, Prowlarr, Lidarr, Plex and Seerr. Optional.
+
+```bash
+mkdir -p ~/arr/config/arr-dashboard
+sudo chown 1000:1000 ~/arr/config/arr-dashboard
+docker compose up -d arr-dashboard
+```
+
+First run creates an admin account at the web UI. Then Settings → Services, and
+add each instance with its API key:
+
+| Service | URL to enter |
+|---|---|
+| Radarr | `http://gluetun:7878` |
+| Sonarr | `http://gluetun:8989` |
+| Prowlarr | `http://gluetun:9696` |
+| Lidarr | `http://gluetun:8686` |
+| Seerr | `http://seerr:5055` |
+| Plex | `http://host.docker.internal:32400` |
+
+The *arr apps are behind the VPN, so they are `gluetun:<port>` from here — the
+same rule as Seerr.
+
+**It does not manage qBittorrent.** It reaches torrent clients only through
+autobrr/qui as a federated peer, which is not installed (GHCR denies anonymous
+pulls). Torrents stay in qBittorrent's own UI.
+
+`config/arr-dashboard/secrets.json` encrypts every stored service API key. Lose
+it and all of them must be re-entered — back up the whole directory, not just
+the database.
+
+Pinned to a specific tag and excluded from Watchtower on purpose: past releases
+have needed a manual database migration, which an unattended update would turn
+into a broken container. Upgrade by bumping the tag after reading the release
+notes.
+
 ## 13. Unpackerr
 
 Fill the API keys in `.env` (each app → Settings → General), then:
@@ -457,7 +495,7 @@ docker logs unpackerr 2>&1 | tail -25
 
 Each of Radarr, Sonarr and Lidarr should report a config count of 1 and no 401.
 
-## 14. Verify end to end
+## 15. Verify end to end
 
 1. Seerr → request a well-seeded older film
 2. Radarr → Activity → Queue shows the grab within a minute or two
@@ -471,7 +509,7 @@ find /data/content/movies -name '*.mkv' -printf '%n %p\n' | head    # want 2, no
 ./vpn-check.sh
 ```
 
-## 15. Maintenance
+## 16. Maintenance
 
 ```bash
 ./update.sh      # gluetun + the 8 sharing its namespace

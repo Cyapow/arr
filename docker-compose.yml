@@ -6,7 +6,7 @@
 #                       bazarr, flaresolverr
 #                       (they share gluetun's network stack; they talk to each other on
 #                        127.0.0.1 and their egress can only leave via the tunnel)
-#   arr bridge       -> gluetun, seerr, unpackerr, dozzle, watchtower
+#   arr bridge       -> gluetun, seerr, arr-dashboard, unpackerr, dozzle, watchtower
 #                       (unpackerr reaches the *arr APIs at http://gluetun:<port>)
 #   host             -> plex (LAN discovery, remote access, iGPU transcode)
 
@@ -251,6 +251,46 @@ services:
       retries: 3
       start_period: 40s
 
+  # ────────────────────────────────────────────────────────────────────
+  # arr-dashboard — single pane over Radarr/Sonarr/Prowlarr/Lidarr/Plex/Seerr.
+  # Bridge network: it needs the *arr APIs through gluetun, Plex on the host,
+  # and the internet for TMDB/TRaSH.
+  #
+  # Pinned deliberately, and excluded from Watchtower: past releases have
+  # required a manual database migration on upgrade (v2.20.0 needed db:push),
+  # which an unattended 04:00 update would turn into a broken container.
+  # Upgrade by bumping this tag and reading the release notes first.
+  # ────────────────────────────────────────────────────────────────────
+  arr-dashboard:
+    image: khak1s/arr-dashboard:2.24.1
+    container_name: arr-dashboard
+    restart: unless-stopped
+    stop_grace_period: 120s     # it needs time to close the sqlite db cleanly
+    mem_limit: 3g
+    networks:
+      - arr
+    dns:
+      - ${LAN_DNS}
+      - 1.1.1.1
+    dns_opt:
+      - timeout:2
+      - attempts:5
+    ports:
+      - "${LAN_IP}:3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Plex runs on the host netns
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      # Holds prod.db (all settings and users) and secrets.json. Lose
+      # secrets.json and every stored service API key becomes undecryptable
+      # and has to be re-entered.
+      - ./config/arr-dashboard:/config
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
   unpackerr:
     image: ghcr.io/unpackerr/unpackerr:latest
     container_name: unpackerr
@@ -292,7 +332,7 @@ services:
       - "${LAN_IP}:8888:8080"
     environment:
       TZ: ${TZ}
-      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|seerr|unpackerr|watchtower"
+      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|seerr|arr-dashboard|unpackerr|watchtower"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
