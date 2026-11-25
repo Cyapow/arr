@@ -6,7 +6,7 @@
 #                       bazarr, flaresolverr
 #                       (they share gluetun's network stack; they talk to each other on
 #                        127.0.0.1 and their egress can only leave via the tunnel)
-#   arr bridge       -> gluetun, seerr, arr-dashboard, unpackerr, dozzle, watchtower
+#   arr bridge       -> gluetun, seerr, arr-dashboard, qui, unpackerr, dozzle, watchtower
 #                       (unpackerr reaches the *arr APIs at http://gluetun:<port>)
 #   host             -> plex (LAN discovery, remote access, iGPU transcode)
 
@@ -291,6 +291,36 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "false"
 
+  # ────────────────────────────────────────────────────────────────────
+  # qui — modern qBittorrent UI (autobrr). Bridge network: qBittorrent lives
+  # in gluetun's namespace, so it is reached at gluetun:8080 from here.
+  #
+  # Pinned and excluded from Watchtower: this is a v0.x project, and the
+  # image cannot be re-pulled unattended anyway while a stale ghcr.io
+  # credential sits in ~/.docker/config.json (see DECISIONS.md).
+  # ────────────────────────────────────────────────────────────────────
+  qui:
+    image: ghcr.io/autobrr/qui:v0.3.0
+    container_name: qui
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    networks:
+      - arr
+    dns:
+      - ${LAN_DNS}
+      - 1.1.1.1
+    dns_opt:
+      - timeout:2
+      - attempts:5
+    ports:
+      - "${LAN_IP}:7476:7476"
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./config/qui:/config      # HOME and XDG dirs point here
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
   unpackerr:
     image: ghcr.io/unpackerr/unpackerr:latest
     container_name: unpackerr
@@ -332,7 +362,7 @@ services:
       - "${LAN_IP}:8888:8080"
     environment:
       TZ: ${TZ}
-      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|seerr|arr-dashboard|unpackerr|watchtower"
+      DOZZLE_FILTER: "name=gluetun|qbittorrent|nzbget|radarr|sonarr|lidarr|prowlarr|bazarr|flaresolverr|plex|seerr|arr-dashboard|qui|unpackerr|watchtower"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 

@@ -235,6 +235,44 @@ Sonarr additionally had **season folders disabled**, leaving every episode loose
 in the series directory. `seasonFolder=true` applies to new imports only; a
 `RenameSeries` pass afterwards relocates existing files.
 
+### A stale ghcr.io credential looks exactly like a private registry
+
+`docker pull ghcr.io/autobrr/qui` failed with `error from registry: denied` on
+every tag, for a month. The obvious reading — the package is private, or needs a
+GitHub PAT — was wrong, and it blocked installing qui twice.
+
+Walking the pull chain by hand with `curl` and an anonymous token showed the
+registry serving everything happily:
+
+```
+tags/list            200
+manifest (index)     200
+manifest (amd64)     200
+config blob          200
+docker pull          denied        <- even by digest
+```
+
+The registry was never refusing. `~/.docker/config.json` holds an `auths` entry
+for `ghcr.io`, so the Docker client sent that credential instead of pulling
+anonymously, and GHCR rejected it. Anything needing no auth at all fails, while
+`curl` succeeds because it never sees the token.
+
+Pulled with an isolated empty config, which leaves the real one untouched:
+
+```bash
+mkdir -p /tmp/anon-docker && printf '{}' > /tmp/anon-docker/config.json
+DOCKER_CONFIG=/tmp/anon-docker docker pull ghcr.io/autobrr/qui:v0.3.0
+```
+
+**The credential was deliberately not removed**: `ghcr.io/docwrightio/*` images
+on this host may depend on it. The proper fix is to `docker login ghcr.io` with
+a current PAT, or `docker logout ghcr.io` if nothing private is needed. Until
+then, any anonymous ghcr.io pull — including `docker compose pull` for qui and
+flaresolverr — needs the `DOCKER_CONFIG` workaround.
+
+The lesson: when a registry says `denied`, check whether the client is sending
+credentials before concluding the image is private.
+
 ### Deleting a download by link count can kill a pending import
 
 `links == 1` means no other path references the file, which usually means the
@@ -317,11 +355,8 @@ database migration (v2.20.0 needed `db:push`), so an unattended 04:00 update
 could leave it broken until someone noticed. The media path is unaffected either
 way; it is a read-and-control UI, not part of the download pipeline.
 
-It also does **not** manage qBittorrent. It talks to torrent clients only
-through autobrr/qui as a "federated peer", and qui could not be installed —
-GHCR denies anonymous pulls of every tag, and the newest release is v0.3.0.
-Torrents therefore stay in qBittorrent's own UI, so "one pane for everything" is
-really "one pane for the *arr apps, Plex and Seerr".
+It reaches qBittorrent only through autobrr/qui as a "federated peer". qui is
+now installed (step 14), so torrents are visible too.
 
 **Seeding removed after 10 days, with content** — `RemoveWithContent` sounds
 destructive and is not, *given hardlinks*: the downloads path and the library

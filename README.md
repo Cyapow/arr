@@ -34,7 +34,7 @@ gluetun ─┬─ qbittorrent  nzbget                 downloaders
          ├─ radarr  sonarr  lidarr  prowlarr    indexer + library managers
          └─ bazarr  flaresolverr                subtitles, cloudflare solver
 
-arr bridge ── seerr  arr-dashboard  unpackerr  dozzle  watchtower
+arr bridge ── seerr  arr-dashboard  qui  unpackerr  dozzle  watchtower
 
 host network ── plex
 ```
@@ -69,6 +69,7 @@ tunnel reaches them at the hostname `gluetun`.
 | Plex | http://10.0.0.22:32400/web | no — deliberate |
 | Seerr | http://10.0.0.22:5055 | no |
 | arr-dashboard | http://10.0.0.22:3000 | no |
+| qui (qBittorrent UI) | http://10.0.0.22:7476 | no |
 | Dozzle (logs) | http://10.0.0.22:8888 | no |
 
 ## Storage

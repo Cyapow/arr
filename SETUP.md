@@ -44,7 +44,7 @@ relative to wherever they are, and the media root is set once in
 ## 2. Directories
 
 ```bash
-mkdir -p ~/arr/config/{gluetun,qbittorrent,nzbget,radarr,sonarr,lidarr,prowlarr,bazarr,seerr,arr-dashboard,unpackerr,plex}
+mkdir -p ~/arr/config/{gluetun,qbittorrent,nzbget,radarr,sonarr,lidarr,prowlarr,bazarr,seerr,arr-dashboard,qui,unpackerr,plex}
 mkdir -p /data/content/{movies,series,music,movies-kids,series-kids}
 mkdir -p /data/content/downloads/{complete,incomplete}
 mkdir -p /data/content/downloads/complete/{Movies,Series,Music,Prowlarr}
@@ -471,9 +471,8 @@ add each instance with its API key:
 The *arr apps are behind the VPN, so they are `gluetun:<port>` from here — the
 same rule as Seerr.
 
-**It does not manage qBittorrent.** It reaches torrent clients only through
-autobrr/qui as a federated peer, which is not installed (GHCR denies anonymous
-pulls). Torrents stay in qBittorrent's own UI.
+**qBittorrent is reached through qui**, not directly — add qui as a federated
+peer in arr-dashboard (step 14).
 
 `config/arr-dashboard/secrets.json` encrypts every stored service API key. Lose
 it and all of them must be re-entered — back up the whole directory, not just
@@ -483,6 +482,34 @@ Pinned to a specific tag and excluded from Watchtower on purpose: past releases
 have needed a manual database migration, which an unattended update would turn
 into a broken container. Upgrade by bumping the tag after reading the release
 notes.
+
+## 14. qui — http://10.0.0.22:7476
+
+A modern qBittorrent UI, and the only way arr-dashboard can see torrents.
+Worth it for the bulk filtering and selection alone — the stock WebUI makes
+clearing a batch of dead torrents tedious.
+
+```bash
+mkdir -p ~/arr/config/qui
+sudo chown 1000:1000 ~/arr/config/qui
+docker compose up -d qui
+```
+
+First run creates an admin account. Then add the qBittorrent instance:
+
+| Field | Value |
+|---|---|
+| Host | `http://gluetun:8080` |
+| Username / password | your qBittorrent WebUI credentials |
+
+qBittorrent lives inside gluetun's network namespace, so it is `gluetun:8080`
+from the bridge — the same rule as Seerr and arr-dashboard.
+
+To join it to arr-dashboard: arr-dashboard → Settings → Services → add qui at
+`http://qui:7476`.
+
+Pinned and excluded from Watchtower: it is a v0.x project, and the image cannot
+be re-pulled unattended while the stale credential below exists.
 
 ## 13. Unpackerr
 
