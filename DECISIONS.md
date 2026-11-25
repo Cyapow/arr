@@ -235,6 +235,26 @@ Sonarr additionally had **season folders disabled**, leaving every episode loose
 in the series directory. `seasonFolder=true` applies to new imports only; a
 `RenameSeries` pass afterwards relocates existing files.
 
+### qui + qBittorrent 5.x: "status code: 204: unexpected status code"
+
+qui connected to qBittorrent and reported `login error; status code: 204`.
+It reads as an auth failure and is not one.
+
+qBittorrent 5.2.3 answers `/api/v2/auth/login` with **204 No Content** on
+success. qui v0.3.0 only accepts `200 Ok.`, so a perfectly good login looks
+like an error. Proof that the credentials were fine: the same endpoint returns
+`401 Unauthorized` for deliberately wrong ones, and `403` for an unauthenticated
+API call — so 204 could only mean accepted.
+
+Fixed by running qui v1.x. Do not pin below v1.
+
+**Finding the right tag needed two corrections.** `GET /v2/<repo>/tags/list`
+is paginated: the default page returned 100 tags whose highest semver was
+v0.3.0, which is how qui got written off as an early v0.x project. Asking for
+`?n=1000` gave v1.23.0. Even that was short — qui's own startup log then
+announced v1.36.1. When a registry tag list sets the version expectation, page
+it fully, and prefer what the application reports about itself.
+
 ### A stale ghcr.io credential looks exactly like a private registry
 
 `docker pull ghcr.io/autobrr/qui` failed with `error from registry: denied` on

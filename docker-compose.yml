@@ -295,12 +295,16 @@ services:
   # qui — modern qBittorrent UI (autobrr). Bridge network: qBittorrent lives
   # in gluetun's namespace, so it is reached at gluetun:8080 from here.
   #
-  # Pinned and excluded from Watchtower: this is a v0.x project, and the
-  # image cannot be re-pulled unattended anyway while a stale ghcr.io
-  # credential sits in ~/.docker/config.json (see DECISIONS.md).
+  # Pinned and excluded from Watchtower: the image cannot be re-pulled
+  # unattended while a stale ghcr.io credential sits in
+  # ~/.docker/config.json (see DECISIONS.md).
+  #
+  # Must be >= v1.x: qBittorrent 5.x returns 204 on a successful login and
+  # older qui builds only accept 200, failing with
+  # "login error; status code: 204: unexpected status code".
   # ────────────────────────────────────────────────────────────────────
   qui:
-    image: ghcr.io/autobrr/qui:v0.3.0
+    image: ghcr.io/autobrr/qui:v1.23.0
     container_name: qui
     restart: unless-stopped
     user: "${PUID}:${PGID}"

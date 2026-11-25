@@ -508,8 +508,13 @@ from the bridge — the same rule as Seerr and arr-dashboard.
 To join it to arr-dashboard: arr-dashboard → Settings → Services → add qui at
 `http://qui:7476`.
 
-Pinned and excluded from Watchtower: it is a v0.x project, and the image cannot
-be re-pulled unattended while the stale credential below exists.
+Must be **v1.x or newer**. qBittorrent 5.x returns `204 No Content` on a
+successful login; older qui builds only accept `200` and fail with
+*"login error; status code: 204: unexpected status code"* despite correct
+credentials.
+
+Pinned and excluded from Watchtower: the image cannot be re-pulled unattended
+while the stale ghcr.io credential below exists.
 
 ## 13. Unpackerr
 
